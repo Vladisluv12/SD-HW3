@@ -1,0 +1,5 @@
+package fileanalysis
+
+func main() {
+
+}

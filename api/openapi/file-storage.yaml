@@ -1,0 +1,191 @@
+openapi: 3.0.3
+info:
+  title: File Storage Service API
+  description: Service for storing and retrieving files
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081/api/v1
+    description: File Storage Service
+tags:
+  - name: Files
+    description: File storage operations
+paths:
+  /files:
+    post:
+      tags: [Files]
+      summary: Upload a file
+      operationId: uploadFile
+      description: Uploads a file and stores it in the storage system
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [student_id, assignment_id, file]
+              properties:
+                student_id:
+                  type: string
+                  minLength: 1
+                assignment_id:
+                  type: string
+                  minLength: 1
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          description: File too large
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /files/{file_id}:
+    get:
+      tags: [Files]
+      summary: Download a file
+      operationId: getFile
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /files/{file_id}/metadata:
+    get:
+      tags: [Files]
+      summary: Get file metadata
+      operationId: getFileMetadata
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileMetadata'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /internal/files/{file_id}/content:
+    get:
+      tags: [Files]
+      summary: Get file content for internal use (for analysis service)
+      operationId: getFileContentInternal
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+    FileUploadResponse:
+      type: object
+      required: [file_id, work_id]
+      properties:
+        file_id:
+          type: string
+          description: Unique file identifier
+        work_id:
+          type: string
+          description: Work identifier (created from student_id + assignment_id + timestamp)
+        filename:
+          type: string
+        size_bytes:
+          type: integer
+          minimum: 0
+        uploaded_at:
+          type: string
+          format: date-time
+        storage_path:
+          type: string
+          description: Path where file is stored (local or S3)
+
+    FileMetadata:
+      type: object
+      properties:
+        file_id:
+          type: string
+        work_id:
+          type: string
+        student_id:
+          type: string
+        assignment_id:
+          type: string
+        filename:
+          type: string
+        content_type:
+          type: string
+        size_bytes:
+          type: integer
+        uploaded_at:
+          type: string
+          format: date-time
+        checksum:
+          type: string
+          description: MD5 or SHA256 checksum
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: File not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

@@ -1,0 +1,7 @@
+CREATE TABLE works (
+    work_id VARCHAR(255) PRIMARY KEY,
+    student_id VARCHAR(255) NOT NULL,
+    assignment_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -1,0 +1,262 @@
+openapi: 3.0.3
+info:
+  title: File Analysis Service API
+  description: Service for analyzing files for plagiarism and generating reports
+  version: 1.0.0
+servers:
+  - url: http://localhost:8082/api/v1
+    description: File Analysis Service
+tags:
+  - name: Analysis
+    description: File analysis operations
+  - name: Reports
+    description: Report management
+paths:
+  /analyze:
+    post:
+      tags: [Analysis]
+      summary: Analyze a file for plagiarism
+      operationId: analyzeFile
+      description: Immediately analyzes a file for plagiarism (synchronous operation)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /reports/{report_id}:
+    get:
+      tags: [Reports]
+      summary: Get analysis report
+      operationId: getReport
+      parameters:
+        - name: report_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports:
+    get:
+      tags: [Reports]
+      summary: List reports with filtering
+      operationId: listReports
+      parameters:
+        - name: work_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: file_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: assignment_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: student_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /reports/work/{work_id}:
+    get:
+      tags: [Reports]
+      summary: Get all reports for a work
+      operationId: getWorkReports
+      parameters:
+        - name: work_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of reports for the work
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "OK"
+
+components:
+  schemas:
+    AnalysisRequest:
+      type: object
+      required: [work_id, file_id]
+      properties:
+        work_id:
+          type: string
+          description: Work identifier
+        file_id:
+          type: string
+          description: File identifier to analyze
+        student_id:
+          type: string
+          description: Student identifier
+        assignment_id:
+          type: string
+          description: Assignment identifier
+
+    Report:
+      type: object
+      properties:
+        report_id:
+          type: string
+        work_id:
+          type: string
+        file_id:
+          type: string
+        student_id:
+          type: string
+        assignment_id:
+          type: string
+        plagiarism_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Percentage of plagiarism detected (0-100)
+        is_plagiarism:
+          type: boolean
+          description: True if plagiarism detected (based on threshold)
+        similar_works:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimilarWork'
+          description: List of similar works found
+        word_count:
+          type: integer
+          minimum: 0
+        analysis_duration_ms:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [completed, failed]
+          default: completed
+        error_message:
+          type: string
+          description: Error message if status is failed
+        created_at:
+          type: string
+          format: date-time
+
+    SimilarWork:
+      type: object
+      properties:
+        work_id:
+          type: string
+        student_id:
+          type: string
+        similarity_percentage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum: [validation_error, not_found, internal_error, analysis_failed]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

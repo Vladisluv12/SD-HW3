@@ -4,7 +4,7 @@ info:
   description: Service for storing and retrieving files
   version: 1.0.0
 servers:
-  - url: http://localhost:8081/api/v1
+  - url: http://localhost:8081/
     description: File Storage Service
 tags:
   - name: Files
@@ -62,12 +62,48 @@ paths:
         '200':
           description: File content
           content:
-            application/octet-stream:
+            multipart/form-data:
               schema:
-                type: string
-                format: binary
+                type: object
+                properties:
+                  file:
+                    type: string
+                    format: binary
+                  caption:
+                    type: string
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /files/{file_id}/exists:
+    get:
+      tags: [Files]
+      summary: Check if file exists
+      operationId: checkFileExists
+      description: Returns file ids of similar files based on checksum
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File existence check result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: ["files"]
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: string
+                    description: file ids if file exists, nothing otherwise
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /files/{file_id}/metadata:
     get:

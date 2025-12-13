@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # PostgreSQL для всех микросервисов
+  postgres-file-storage:
+    image: postgres:15-alpine
+    container_name: postgres-file-storage-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: file_storage
+    volumes:
+      -  postgres-file-storage-data:/var/lib/postgresql/data
+      - ./migrations/file-storage:/docker-entrypoint-initdb.d/file-storage
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U file_storage"]
+      interval: 5s
+      timeout: 2.5s
+      retries: 5
+    restart: unless-stopped
+  
+  postgres-file-analysis:
+    image: postgres:15-alpine
+    container_name: postgres-file-analysis
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: file_analysis
+    volumes:
+      - postgres-file-analysis-data:/var/lib/postgresql/data
+      - ./migrations/file-analysis:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U file_analysis"]
+      interval: 5s
+      timeout: 2.5s
+      retries: 5
+    restart: unless-stopped
+
+  # File Storage Service
+  file-storage:
+    build:
+      context: .
+      dockerfile: cmd/file-storage/Dockerfile
+    container_name: file-storage-service
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - UPLOAD_DIR=/uploads
+      - MAX_FILE_SIZE=10485760
+      - DB_CONNECTION_STRING=postgres://postgres:password@postgres-file-storage:5432/file_storage?sslmode=disable
+      - RUN_MIGRATIONS=true
+      - MIGRATIONS_DIR=/migrations/file-storage
+    volumes:
+      - file-uploads:/uploads
+      - ./migrations/file-storage:/migrations/file-storage
+    depends_on:
+      postgres-file-storage:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # File Analysis Service
+  file-analysis:
+    build:
+      context: .
+      dockerfile: cmd/file-analysis/Dockerfile
+    container_name: file-analysis-service
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - FILE_STORAGE_URL=http://file-storage:8081
+      - DB_CONNECTION_STRING=postgres://postgres:password@postgres-file-analysis:5432/file_analysis?sslmode=disable
+      - RUN_MIGRATIONS=true
+      - MIGRATIONS_DIR=/migrations/file-analysis
+    volumes:
+      - ./migrations/file-analysis:/migrations/file-analysis
+    depends_on:
+      - postgres-file-analysis
+      - file-storage
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway
+  gateway:
+    build:
+      context: .
+      dockerfile: cmd/gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - FILE_STORAGE_URL=http://file-storage:8081
+      - FILE_ANALYSIS_URL=http://file-analysis:8082
+    depends_on:
+      - file-storage
+      - file-analysis
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres-file-storage-data:
+  postgres-file-analysis-data:
+  file-uploads:
+
+networks:
+  app-network:
+    driver: bridge

@@ -4,7 +4,7 @@ info:
   description: Service for analyzing files for plagiarism and generating reports
   version: 1.0.0
 servers:
-  - url: http://localhost:8082/api/v1
+  - url: http://localhost:8082/
     description: File Analysis Service
 tags:
   - name: Analysis
@@ -17,7 +17,7 @@ paths:
       tags: [Analysis]
       summary: Analyze a file for plagiarism
       operationId: analyzeFile
-      description: Immediately analyzes a file for plagiarism (synchronous operation)
+      description: Immediately analyzes a file for plagiarism
       requestBody:
         required: true
         content:
